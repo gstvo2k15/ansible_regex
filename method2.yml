@@ -1,0 +1,22 @@
+- name: Compute product_version per instance
+  set_fact:
+    product_version_by_inst: >-
+      {{
+        product_version_by_inst | default({}) |
+        combine({
+          item.name:
+            (
+              item.tomcat_rpm
+              | regex_replace('^.*-([0-9]+\\.[0-9]+)\\.[0-9]+\\.sp[0-9]+-.*$', '\\1')
+            )
+            if (
+              item.tomcat_rpm is defined and
+              item.tomcat_rpm != 'Not_found' and
+              item.tomcat_rpm is regex('.*-[0-9]+\\.[0-9]+\\.[0-9]+\\.sp[0-9]+-.*')
+            )
+            else 'Not_found'
+        })
+      }}
+  loop: "{{ instances | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"

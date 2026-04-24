@@ -1,0 +1,22 @@
+- name: Extract tomcat RPM version
+  set_fact:
+    tomcat_rpm_version: "{{ item.tomcat_rpm.split('-')[-2] }}"
+  when:
+    - item.tomcat_rpm is defined
+    - item.tomcat_rpm != 'Not_found'
+    - item.tomcat_rpm.split('-') | length >= 2
+  loop: "{{ instances | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Compute product versions per instance
+  set_fact:
+    product_version_by_inst: "{{ product_version_by_inst | default({}) | combine({ item.name: product_version }) }}"
+    product_patch_version_by_inst: "{{ product_patch_version_by_inst | default({}) | combine({ item.name: product_patch_version }) }}"
+  vars:
+    rpm_parts: "{{ item.tomcat_rpm.split('-') }}"
+    product_patch_version: "{{ rpm_parts[-2] if item.tomcat_rpm is defined and item.tomcat_rpm != 'Not_found' and rpm_parts | length >= 2 else 'Not_found' }}"
+    product_version: "{{ product_patch_version.split('.')[0:2] | join('.') if product_patch_version != 'Not_found' else 'Not_found' }}"
+  loop: "{{ instances | default([]) }}"
+  loop_control:
+    label: "{{ item.name }}"

@@ -1,0 +1,81 @@
+- name: GET ITSM/Middleware/Application product version from ITSM
+  uri:
+    url: "{{ itsm_url_base }}{{ inventory_hostname_short }}\\{{ item.name | default(item) }}"
+    method: GET
+    validate_certs: false
+    status_code: [200, 201, 204]
+    follow_redirects: all
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+      x-apikey: "{{ apigee_test }}"
+    body_format: json
+  loop: "{{ elastic_instances | default([]) }}"
+  loop_control:
+    label: "{{ inventory_hostname_short }}_{{ item.name | default(item) }}"
+  register: itsm_get_product
+  delegate_to: localhost
+  retries: 3
+  delay: 5
+  ignore_errors: true
+
+- name: Debug of ITSM GET response
+  debug:
+    var: item.json
+  loop: "{{ itsm_get_product.results }}"
+  when: item.json is defined
+  ignore_errors: true
+
+- name: POST ITSM/Middleware/Application for generate minimal entry
+  uri:
+    url: "{{ itsm_relationship_url }}"
+    method: POST
+    validate_certs: false
+    status_code: [200, 201, 204]
+    follow_redirects: all
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+      x-apikey: "{{ itsm_apigee }}"
+    body_format: json
+    body:
+      name: "{{ item.item.name | default(item.item) }}"
+      environment: "Development"
+      class: "Apache Tomcat instances"
+      department: "GLOBAL.CIB.Production.Infrastructure.Computing.Middleware"
+      support_group: "BNPP_CIB_GLOBAL_ITO_PROD_INFRA_CAAS_WEB_SDM"
+      management_group: "BNPP_CIB_GLOBAL_ITO_PROD_INFRA_CAAS_WEB_SDM"
+  loop: "{{ itsm_get_product.results | default([]) }}"
+  loop_control:
+    label: "{{ inventory_hostname_short }}_{{ item.item.name | default(item.item) }}"
+  register: itsm_create_product
+  delegate_to: localhost
+  retries: 3
+  delay: 5
+  ignore_errors: true
+  when: item.status | default(0) != 200
+
+- name: Finish with POST ITSM/Middleware/Application/RelationShip/Server as first time
+  uri:
+    url: "{{ itsm_relationship_url }}"
+    method: POST
+    validate_certs: false
+    status_code: [200, 201, 204]
+    follow_redirects: all
+    headers:
+      Accept: "application/json"
+      Content-Type: "application/json"
+      x-apikey: "{{ itsm_apigee }}"
+    body_format: json
+    body:
+      servername: "{{ inventory_hostname_short }}"
+      applicationname: "{{ item.item.name | default(item.item) }}"
+  loop: "{{ itsm_get_product.results | default([]) }}"
+  loop_control:
+    label: "{{ inventory_hostname_short }}_{{ item.item.name | default(item.item) }}"
+  register: itsm_create_relationship
+  delegate_to: localhost
+  retries: 3
+  delay: 5
+  ignore_errors: true
+  when: item.status | default(0) != 200
